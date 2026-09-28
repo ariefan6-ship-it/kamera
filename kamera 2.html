@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Web CamStream P2P - Clean Fullscreen & HTTPS Ready</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PeerJS CDN -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- QRCode.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .pulse-connected {
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        /* Custom Smooth Fade for Auto-Hide Overlay */
+        .overlay-fade {
+            transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out, visibility 0.4s;
+        }
+        .overlay-hidden {
+            opacity: 0 !important;
+            transform: translateY(12px) !important;
+            pointer-events: none !important;
+            visibility: hidden !important;
+        }
+        /* Hide scrollbars for full clean display */
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+    <header id="mainHeader" class="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md fixed top-0 left-0 right-0 z-50 transition-opacity duration-300">
+        <div class="max-w-7xl mx-auto px-4 py-2.5 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2 rounded-xl text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-video text-base"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base leading-tight tracking-wide">CamStream<span class="text-indigo-400">P2P</span></h1>
+                    <p class="text-[10px] text-slate-400">Ultra-Clean Camera Monitor</p>
+                </div>
+            </div>
+
+            <!-- Header Connection Badge & Help Button -->
+            <div class="flex items-center gap-3">
+                <button onclick="openHttpsGuideModal()" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs hover:bg-amber-500/20 transition">
+                    <i class="fa-solid fa-shield-halved text-amber-400"></i>
+                    <span>Panduan HTTPS Lokal</span>
+                </button>
+                <div id="statusBadge" class="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-xs font-medium text-slate-300">
+                    <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                    <span id="statusText">Belum Terhubung</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="w-full min-h-screen flex flex-col justify-center items-center relative">
+
+        <!-- ======================================================== -->
+        <!-- 1. ROLE SELECTOR SCREEN                                 -->
+        <!-- ======================================================== -->
+        <div id="roleSelector" class="space-y-6 max-w-4xl px-4 py-20 w-full my-auto z-10">
+            <div class="text-center max-w-2xl mx-auto space-y-3">
+                <span class="px-3 py-1 bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 rounded-full text-xs font-semibold uppercase tracking-wider">
+                    WebRTC Kamera P2P
+                </span>
+                <h2 class="text-3xl font-extrabold text-white sm:text-4xl tracking-tight">Pilih Peran Perangkat Ini</h2>
+                <p class="text-slate-400 text-sm sm:text-base">Streaming langsung dari kamera HP ke Komputer tanpa delay dan tanpa server Node.js tambahan.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto pt-2">
+                <!-- Option 1: Sender (HP) -->
+                <button onclick="selectRole('sender')" class="glass-card p-6 rounded-2xl hover:border-indigo-500/50 transition-all duration-300 hover:scale-[1.02] text-left group flex flex-col justify-between h-full shadow-2xl relative overflow-hidden">
+                    <div class="absolute -right-6 -bottom-6 text-indigo-500/5 text-8xl font-black group-hover:text-indigo-500/10 transition-colors">HP</div>
+                    <div>
+                        <div class="w-12 h-12 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-mobile-screen-button text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Kirim Kamera (HP / Sender)</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">
+                            Gunakan HP ini sebagai sumber kamera. Menghasilkan ID unik dan QR Code untuk dipindai oleh Komputer.
+                        </p>
+                    </div>
+                    <div class="mt-6 flex items-center text-indigo-400 font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                        <span>Mulai Kamera HP</span>
+                        <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </div>
+                </button>
+
+                <!-- Option 2: Receiver (Komputer) -->
+                <button onclick="selectRole('receiver')" class="glass-card p-6 rounded-2xl hover:border-emerald-500/50 transition-all duration-300 hover:scale-[1.02] text-left group flex flex-col justify-between h-full shadow-2xl relative overflow-hidden">
+                    <div class="absolute -right-6 -bottom-6 text-emerald-500/5 text-8xl font-black group-hover:text-emerald-500/10 transition-colors">PC</div>
+                    <div>
+                        <div class="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-desktop text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white mb-2">Terima Stream (Komputer / Receiver)</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">
+                            Layar monitor penerima. Tampilan video **100% Fullscreen, Edge-to-Edge** dengan kontrol melayang auto-hide.
+                        </p>
+                    </div>
+                    <div class="mt-6 flex items-center text-emerald-400 font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                        <span>Buka Fullscreen Monitor</span>
+                        <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </div>
+                </button>
+            </div>
+
+            <div class="text-center pt-4">
+                <button onclick="openHttpsGuideModal()" class="sm:hidden inline-flex items-center gap-2 text-xs text-amber-400 hover:underline">
+                    <i class="fa-solid fa-shield-halved"></i> Mengalami masalah Kamera HP? Baca Panduan HTTPS
+                </button>
+            </div>
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- 2. SENDER VIEW (HP CAPTURE & CONTROLS)                   -->
+        <!-- ======================================================== -->
+        <div id="senderView" class="hidden space-y-6 max-w-4xl px-4 py-20 w-full z-10 my-auto">
+            <div class="flex items-center justify-between">
+                <button onclick="resetRole()" class="text-slate-400 hover:text-white text-sm flex items-center gap-2 transition bg-slate-900/60 px-3 py-1.5 rounded-xl border border-slate-800">
+                    <i class="fa-solid fa-chevron-left"></i> Ganti Peran
+                </button>
+                <span class="text-xs font-mono bg-indigo-950/80 text-indigo-300 px-3 py-1.5 rounded-full border border-indigo-800/50">MODE: SENDER (HP)</span>
+            </div>
+
+            <!-- HTTPS Insecure Warning Banner (If Not Secure Context) -->
+            <div id="httpsWarningBanner" class="hidden bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex items-start gap-3 text-xs text-amber-200">
+                <i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg mt-0.5"></i>
+                <div class="space-y-1">
+                    <strong class="font-semibold block text-amber-300">Peringatan Akses Kamera Browser (Insecure Context)</strong>
+                    <p class="text-amber-200/80">Kamera HP tidak dapat diakses jika web dibuka menggunakan HTTP biasa di IP Lokal. Gunakan HTTPS atau ubah aturan Chrome Flags di HP Anda.</p>
+                    <button onclick="openHttpsGuideModal()" class="text-amber-300 underline font-semibold mt-1 inline-block">
+                        Lihat Cara Mengaktifkan HTTPS / Chrome Flags &rarr;
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid lg:grid-cols-5 gap-6">
+                <!-- Video Monitor (3 cols) -->
+                <div class="lg:col-span-3 glass-card p-4 rounded-2xl flex flex-col justify-between">
+                    <div class="relative bg-slate-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-slate-800 shadow-inner">
+                        <video id="localVideo" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
+                        <div id="cameraOverlay" class="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center gap-3 p-4 text-center">
+                            <i class="fa-solid fa-circle-notch text-3xl text-indigo-500 animate-spin"></i>
+                            <p id="cameraOverlayText" class="text-slate-300 text-xs font-medium">Menyiapkan Kamera HP...</p>
+                        </div>
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="flex items-center justify-center gap-2 sm:gap-3 mt-4 flex-wrap">
+                        <button id="toggleCamBtn" onclick="toggleLocalVideo()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition shadow text-xs flex items-center gap-2">
+                            <i class="fa-solid fa-video"></i> <span>Kamera On</span>
+                        </button>
+                        <button id="toggleMicBtn" onclick="toggleLocalAudio()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition shadow text-xs flex items-center gap-2">
+                            <i class="fa-solid fa-microphone"></i> <span>Mic On</span>
+                        </button>
+                        <button id="switchCamBtn" onclick="switchCamera()" class="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow text-xs font-medium flex items-center gap-2">
+                            <i class="fa-solid fa-rotate"></i> <span>Ganti Kamera</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Connection Info & QR Code (2 cols) -->
+                <div class="lg:col-span-2 glass-card p-5 rounded-2xl flex flex-col justify-between space-y-4">
+                    <div>
+                        <h3 class="font-bold text-sm text-white mb-1 flex items-center gap-2">
+                            <i class="fa-solid fa-qrcode text-indigo-400"></i> Hubungkan ke Komputer
+                        </h3>
+                        <p class="text-xs text-slate-400 mb-3">Scan QR ini menggunakan Kamera HP lain / Browser Komputer atau salin ID dibawah.</p>
+
+                        <!-- Peer ID Box -->
+                        <div class="bg-slate-900/90 p-3 rounded-xl border border-slate-800 mb-3">
+                            <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">ID Perangkat HP Ini</label>
+                            <div class="flex items-center justify-between gap-2">
+                                <span id="senderPeerId" class="font-mono text-indigo-400 font-bold text-sm tracking-wider truncate">Membuat ID...</span>
+                                <button onclick="copySenderId()" class="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition text-xs flex items-center gap-1">
+                                    <i class="fa-regular fa-copy"></i> Copy
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- QR Code Canvas Container -->
+                        <div class="bg-white p-2.5 rounded-xl flex items-center justify-center mx-auto w-36 h-36 shadow-lg border border-slate-700">
+                            <div id="qrcode"></div>
+                        </div>
+                    </div>
+
+                    <p class="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80 text-center">
+                        <i class="fa-solid fa-circle-info text-indigo-400 mr-1"></i> Jangan tutup halaman HP ini saat siaran berlangsung.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- 3. RECEIVER VIEW (100% FULLSCREEN EDGE-TO-EDGE MONITOR)  -->
+        <!-- ======================================================== -->
+        <div id="receiverView" class="hidden fixed inset-0 w-screen h-screen bg-black overflow-hidden z-20">
+
+            <!-- Remote Video Tag (Clean Edge-to-Edge Fill Screen) -->
+            <video id="remoteVideo" autoplay playsinline class="w-full h-full object-contain transition-all duration-300"></video>
+
+            <!-- Waiting Overlay (Shown when not connected) -->
+            <div id="receiverWaitingOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center space-y-4 z-30">
+                <div class="max-w-md w-full glass-card p-6 rounded-2xl border border-slate-800 space-y-5">
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                        <span class="text-xs font-mono text-emerald-400 font-semibold uppercase">Penerima Stream Video</span>
+                        <button onclick="resetRole()" class="text-xs text-slate-400 hover:text-white">
+                            <i class="fa-solid fa-xmark text-sm"></i>
+                        </button>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="w-14 h-14 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto border border-emerald-500/20">
+                            <i class="fa-solid fa-satellite-dish text-2xl animate-pulse"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white">Sambungkan Kamera HP</h3>
+                        <p class="text-xs text-slate-400">Masukkan ID dari HP untuk mulai menerima tayangan video secara langsung.</p>
+                    </div>
+
+                    <form onsubmit="connectToSender(event)" class="space-y-3 pt-2">
+                        <div class="text-left">
+                            <input type="text" id="remotePeerIdInput" placeholder="Masukkan ID HP (misal: cam-xxxx)" required
+                                class="w-full bg-slate-900 border border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-500 font-mono text-sm outline-none transition">
+                        </div>
+                        <button type="submit" id="btnConnect" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl transition shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 text-sm">
+                            <i class="fa-solid fa-plug"></i> Hubungkan Sekarang
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- AUTO-HIDE FLOATING CONTROLS OVERLAY (Sembunyi setelah 3 detik) -->
+            <div id="receiverOverlayControls" class="overlay-fade absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/85 backdrop-blur-md px-5 py-3 rounded-2xl border border-slate-700/80 shadow-2xl flex items-center gap-4 z-40 max-w-[92vw]">
+                
+                <!-- Connection Status Indicator -->
+                <div class="flex items-center gap-2.5 pr-2 border-r border-slate-700/80">
+                    <span class="flex h-3 w-3 relative">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    </span>
+                    <div class="text-left hidden sm:block">
+                        <p class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 leading-none">LIVE MONITOR</p>
+                        <p id="receiverConnStatusText" class="text-[11px] text-slate-300 font-mono leading-tight truncate max-w-[120px]">Terhubung</p>
+                    </div>
+                </div>
+
+                <!-- Interactive Buttons -->
+                <div class="flex items-center gap-2">
+                    <!-- Toggle Aspect Ratio (Contain vs Cover) -->
+                    <button onclick="toggleVideoFitMode()" id="fitModeBtn" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs transition border border-slate-700/80 flex items-center gap-1.5" title="Ubah Mode Layar (Fit / Cover)">
+                        <i class="fa-solid fa-up-right-and-down-left-from-center text-xs"></i>
+                        <span class="hidden md:inline text-[11px]">Mode Layar</span>
+                    </button>
+
+                    <!-- Mute / Unmute Audio -->
+                    <button onclick="toggleAudioMute()" id="muteReceiverAudioBtn" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs transition border border-slate-700/80 flex items-center gap-1.5" title="Mute/Unmute Audio">
+                        <i class="fa-solid fa-volume-high text-xs"></i>
+                    </button>
+
+                    <!-- Fullscreen Toggle -->
+                    <button onclick="toggleFullscreen()" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs transition border border-slate-700/80 flex items-center gap-1.5" title="Layar Penuh Browser">
+                        <i class="fa-solid fa-expand text-xs"></i>
+                        <span class="hidden md:inline text-[11px]">Fullscreen</span>
+                    </button>
+
+                    <!-- Disconnect Button -->
+                    <button onclick="disconnectReceiver()" class="p-2.5 bg-red-600/80 hover:bg-red-600 text-white rounded-xl text-xs transition ml-1" title="Putuskan Koneksi">
+                        <i class="fa-solid fa-power-off text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Auto-hide Floating Top Bar Notice -->
+            <div id="receiverTopNotice" class="overlay-fade absolute top-4 left-4 right-4 flex justify-between items-center pointer-events-none z-40">
+                <span class="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 font-medium pointer-events-auto">
+                    <i class="fa-solid fa-hand-pointer mr-1.5 text-indigo-400"></i> Gerakkan mouse untuk menampilkan kontrol
+                </span>
+                <button onclick="resetRole()" class="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-800 text-xs text-slate-300 hover:text-white pointer-events-auto transition">
+                    <i class="fa-solid fa-arrow-left mr-1"></i> Keluar Receiver
+                </button>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- MODAL PANDUAN RUNNING HTTPS LOKAL -->
+    <div id="httpsGuideModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+        <div class="glass-card max-w-2xl w-full rounded-2xl border border-slate-700 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-amber-400"></i> Panduan HTTPS Lokal (Izin Kamera HP)
+                </h3>
+                <button onclick="closeHttpsGuideModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 space-y-5 overflow-y-auto text-xs text-slate-300 leading-relaxed">
+                <div class="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl text-amber-200">
+                    <strong>Mengapa Kamera HP Gagal Terbuka?</strong>
+                    <p class="mt-1">Browser HP (Chrome/Safari) secara ketat melarang aplikasi web mengakses kamera apabila tidak menggunakan protokol aman (**HTTPS**), kecuali dibuka di URL `localhost` Komputer itu sendiri.</p>
+                </div>
+
+                <!-- Solution 1: Chrome Flag Bypass -->
+                <div class="space-y-2">
+                    <h4 class="font-bold text-sm text-indigo-300 flex items-center gap-1.5">
+                        <span class="w-5 h-5 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[10px]">1</span>
+                        Cara Tercepat Tanpa Install Apapun (Atur Chrome Flag di HP)
+                    </h4>
+                    <ol class="list-decimal list-inside space-y-1 pl-2 text-slate-400">
+                        <li>Buka aplikasi **Google Chrome** di HP Anda.</li>
+                        <li>Ketik alamat <code class="bg-slate-900 text-indigo-300 px-1.5 py-0.5 rounded border border-slate-800">chrome://flags</code> pada address bar HP.</li>
+                        <li>Cari fitur bernama: <strong class="text-slate-200">"Insecure origins treated as secure"</strong>.</li>
+                        <li>Ubah opsi menjadi <strong class="text-emerald-400">Enabled</strong>.</li>
+                        <li>Masukkan IP Lokal Komputer & Port Anda (contoh: <code class="bg-slate-900 text-indigo-300 px-1.5 py-0.5 rounded border border-slate-800">http://192.168.1.10:8000</code>).</li>
+                        <li>Tekan tombol <strong class="text-white">Relaunch</strong> di bagian bawah untuk me-restart Chrome HP.</li>
+                    </ol>
+                </div>
+
+                <hr class="border-slate-800">
+
+                <!-- Solution 2: Local SSL Server via Node/Python -->
+                <div class="space-y-2">
+                    <h4 class="font-bold text-sm text-indigo-300 flex items-center gap-1.5">
+                        <span class="w-5 h-5 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center text-[10px]">2</span>
+                        Jalankan Server HTTPS Lokal Sederhana
+                    </h4>
+                    <p class="text-slate-400">Jalankan salah satu perintah berikut di terminal/command prompt pada folder tempat file HTML ini berada:</p>
+                    
+                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 font-mono text-[11px] space-y-2">
+                        <div>
+                            <span class="text-slate-500">// Menggunakan NPX (Rekomendasi tanpa install):</span>
+                            <p class="text-emerald-400">npx http-server -S -C cert.pem -K key.pem</p>
+                        </div>
+                        <div>
+                            <span class="text-slate-500">// Menggunakan Local SSL Proxy:</span>
+                            <p class="text-emerald-400">npx local-ssl-proxy --source 8001 --target 8000</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3 bg-slate-900/80 border-t border-slate-800 text-right">
+                <button onclick="closeHttpsGuideModal()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-xl transition">
+                    Saya Mengerti
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // GLOBAL STATE & VARIABLES
+        // ==========================================
+        let currentRole = null; // 'sender' or 'receiver'
+        let peer = null;
+        let localStream = null;
+        let currentCall = null;
+        let currentFacingMode = 'environment'; // Default kamera belakang HP
+        let isAudioEnabled = true;
+        let isVideoEnabled = true;
+        let isVideoCoverFit = false; // False = contain, True = cover
+
+        // Auto-Hide Control Overlay Timer
+        let overlayTimeout = null;
+        const IDLE_TIME_LIMIT = 3000; // 3 detik auto-hide
+
+        // UI DOM Elements
+        const mainHeader = document.getElementById('mainHeader');
+        const roleSelector = document.getElementById('roleSelector');
+        const senderView = document.getElementById('senderView');
+        const receiverView = document.getElementById('receiverView');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const receiverOverlayControls = document.getElementById('receiverOverlayControls');
+        const receiverTopNotice = document.getElementById('receiverTopNotice');
+
+        // ==========================================
+        // INITIALIZATION & URL PARAMETERS
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            // Check if context is secure (HTTPS or Localhost)
+            const isSecureContext = window.isSecureContext;
+            if (!isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                const banner = document.getElementById('httpsWarningBanner');
+                if (banner) banner.classList.remove('hidden');
+            }
+
+            // Auto connect if ID parameter exists in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const peerIdParam = urlParams.get('id');
+            if (peerIdParam) {
+                selectRole('receiver');
+                document.getElementById('remotePeerIdInput').value = peerIdParam;
+            }
+
+            // Bind Overlay Interaction Listener for Receiver Fullscreen
+            setupReceiverOverlayAutoHide();
+        });
+
+        // Update UI Status Badge
+        function updateStatus(state, message) {
+            statusText.innerText = message;
+            statusDot.className = "w-2.5 h-2.5 rounded-full ";
+            
+            if (state === 'connected') {
+                statusDot.classList.add('bg-emerald-500', 'pulse-connected');
+                statusBadge.className = "flex items-center gap-2 bg-emerald-950/60 border border-emerald-800 px-3 py-1.5 rounded-full text-xs font-medium text-emerald-300";
+            } else if (state === 'connecting') {
+                statusDot.classList.add('bg-amber-500', 'animate-ping');
+                statusBadge.className = "flex items-center gap-2 bg-amber-950/60 border border-amber-800 px-3 py-1.5 rounded-full text-xs font-medium text-amber-300";
+            } else {
+                statusDot.classList.add('bg-slate-500');
+                statusBadge.className = "flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-xs font-medium text-slate-300";
+            }
+        }
+
+        // Role Switcher Handler
+        function selectRole(role) {
+            currentRole = role;
+            roleSelector.classList.add('hidden');
+
+            if (role === 'sender') {
+                mainHeader.classList.remove('hidden');
+                senderView.classList.remove('hidden');
+                initSender();
+            } else if (role === 'receiver') {
+                mainHeader.classList.add('hidden'); // Clean display without main header
+                receiverView.classList.remove('hidden');
+                initReceiver();
+            }
+        }
+
+        // Reset Role (Back to Home Screen)
+        function resetRole() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+
+            senderView.classList.add('hidden');
+            receiverView.classList.add('hidden');
+            roleSelector.classList.remove('hidden');
+            mainHeader.classList.remove('hidden');
+            
+            updateStatus('disconnected', 'Belum Terhubung');
+        }
+
+        // ==========================================
+        // SENDER (HP) LOGIC & FALLBACK CAMERA
+        // ==========================================
+        async function initSender() {
+            updateStatus('connecting', 'Membuka Kamera HP...');
+            
+            // 1. Get Camera Stream with Fallbacks
+            await startLocalCameraWithFallback(currentFacingMode);
+
+            // 2. Initialize PeerJS Connection
+            const customId = 'cam-' + Math.random().toString(36).substring(2, 8);
+            peer = new Peer(customId);
+
+            peer.on('open', (id) => {
+                document.getElementById('senderPeerId').innerText = id;
+                generateQRCode(id);
+                updateStatus('disconnected', 'Siap Menunggu Komputer');
+            });
+
+            // 3. Handle incoming call from computer
+            peer.on('call', (call) => {
+                currentCall = call;
+                updateStatus('connecting', 'Menghubungkan ke Receiver...');
+                
+                // Answer call with local media stream
+                call.answer(localStream);
+
+                call.on('stream', () => {
+                    updateStatus('connected', 'Terkoneksi & Live Stream');
+                });
+
+                call.on('close', () => {
+                    updateStatus('disconnected', 'Koneksi Terputus');
+                });
+
+                call.on('error', (err) => {
+                    console.error("Call error:", err);
+                    updateStatus('disconnected', 'Error Koneksi');
+                });
+
+                updateStatus('connected', 'Streaming ke Komputer!');
+            });
+
+            peer.on('error', (err) => {
+                console.error("PeerJS error:", err);
+                updateStatus('disconnected', 'Gagal Membuat ID Peer');
+            });
+        }
+
+        // Robust Camera Capture with Multi-level Fallbacks
+        async function startLocalCameraWithFallback(facingMode) {
+            const overlay = document.getElementById('cameraOverlay');
+            const overlayText = document.getElementById('cameraOverlayText');
+            overlay.classList.remove('hidden');
+
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+
+            // Constraint attempts array (from ideal to basic fallback)
+            const constraintAttempts = [
+                { video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true },
+                { video: { facingMode: facingMode }, audio: true },
+                { video: true, audio: true },
+                { video: true, audio: false }
+            ];
+
+            let streamAcquired = false;
+
+            for (let i = 0; i < constraintAttempts.length; i++) {
+                try {
+                    overlayText.innerText = `Mencoba Akses Kamera (${i + 1}/4)...`;
+                    localStream = await navigator.mediaDevices.getUserMedia(constraintAttempts[i]);
+                    streamAcquired = true;
+                    break;
+                } catch (err) {
+                    console.warn(`Attempt ${i + 1} failed:`, err);
+                }
+            }
+
+            if (streamAcquired) {
+                const localVideo = document.getElementById('localVideo');
+                localVideo.srcObject = localStream;
+                overlay.classList.add('hidden');
+
+                // If in an active call, replace video tracks dynamically
+                if (currentCall) {
+                    const videoTrack = localStream.getVideoTracks()[0];
+                    const sender = currentCall.peerConnection.getSenders().find(s => s && s.track && s.track.kind === 'video');
+                    if (sender) {
+                        sender.replaceTrack(videoTrack);
+                    }
+                }
+            } else {
+                overlayText.innerText = "Gagal mengakses kamera!";
+                alert("Gagal membuka kamera HP.\n\nPastikan Anda memberikan izin kamera di browser dan web diakses melalui HTTPS.");
+                openHttpsGuideModal();
+            }
+        }
+
+        // Switch Facing Camera (Front <-> Back)
+        async function switchCamera() {
+            currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+            const localVideo = document.getElementById('localVideo');
+            
+            if (currentFacingMode === 'user') {
+                localVideo.classList.add('-scale-x-100');
+            } else {
+                localVideo.classList.remove('-scale-x-100');
+            }
+
+            await startLocalCameraWithFallback(currentFacingMode);
+        }
+
+        // Toggle Video Track
+        function toggleLocalVideo() {
+            if (localStream && localStream.getVideoTracks().length > 0) {
+                isVideoEnabled = !isVideoEnabled;
+                localStream.getVideoTracks()[0].enabled = isVideoEnabled;
+                
+                const btn = document.getElementById('toggleCamBtn');
+                btn.innerHTML = isVideoEnabled 
+                    ? `<i class="fa-solid fa-video"></i> <span>Kamera On</span>`
+                    : `<i class="fa-solid fa-video-slash text-red-400"></i> <span>Kamera Off</span>`;
+            }
+        }
+
+        // Toggle Audio Track
+        function toggleLocalAudio() {
+            if (localStream && localStream.getAudioTracks().length > 0) {
+                isAudioEnabled = !isAudioEnabled;
+                localStream.getAudioTracks()[0].enabled = isAudioEnabled;
+
+                const btn = document.getElementById('toggleMicBtn');
+                btn.innerHTML = isAudioEnabled 
+                    ? `<i class="fa-solid fa-microphone"></i> <span>Mic On</span>`
+                    : `<i class="fa-solid fa-microphone-slash text-red-400"></i> <span>Mic Mute</span>`;
+            }
+        }
+
+        // Generate QR Code
+        function generateQRCode(peerId) {
+            const qrContainer = document.getElementById("qrcode");
+            qrContainer.innerHTML = "";
+            
+            const connectUrl = window.location.origin + window.location.pathname + '?id=' + peerId;
+            
+            new QRCode(qrContainer, {
+                text: connectUrl,
+                width: 120,
+                height: 120,
+                colorDark : "#0f172a",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.M
+            });
+        }
+
+        // Copy Peer ID to Clipboard
+        function copySenderId() {
+            const idText = document.getElementById('senderPeerId').innerText;
+            if (!idText || idText.includes('Membuat')) return;
+
+            const tempInput = document.createElement('input');
+            tempInput.value = idText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            alert('ID HP (' + idText + ') berhasil disalin!');
+        }
+
+        // ==========================================
+        // RECEIVER (KOMPUTER) LOGIC
+        // ==========================================
+        function initReceiver() {
+            updateStatus('connecting', 'Membuka Receiver...');
+
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                updateStatus('disconnected', 'Siap Menghubungkan');
+            });
+
+            peer.on('error', (err) => {
+                console.error("PeerJS Error:", err);
+                alert("Terjadi kesalahan koneksi PeerJS: " + err.type);
+                updateStatus('disconnected', 'Gagal Terhubung');
+            });
+        }
+
+        // Connect to Sender Peer ID
+        function connectToSender(event) {
+            if (event) event.preventDefault();
+
+            const remoteId = document.getElementById('remotePeerIdInput').value.trim();
+            if (!remoteId) {
+                alert('Silakan masukkan ID dari HP!');
+                return;
+            }
+
+            updateStatus('connecting', 'Menghubungkan ke HP...');
+
+            const dummyStream = createEmptyMediaStream();
+            const call = peer.call(remoteId, dummyStream);
+            currentCall = call;
+
+            call.on('stream', (remoteStream) => {
+                const remoteVideo = document.getElementById('remoteVideo');
+                remoteVideo.srcObject = remoteStream;
+                
+                document.getElementById('receiverWaitingOverlay').classList.add('hidden');
+                document.getElementById('receiverConnStatusText').innerText = remoteId;
+                updateStatus('connected', 'Streaming Live!');
+
+                // Trigger Initial Overlay Auto-Hide Countdown
+                resetOverlayTimeout();
+            });
+
+            call.on('close', () => {
+                disconnectReceiver();
+            });
+
+            call.on('error', (err) => {
+                console.error("Call error:", err);
+                alert("Gagal terhubung. Pastikan ID HP benar dan HP masih membuka halaman web ini.");
+                updateStatus('disconnected', 'Koneksi Gagal');
+            });
+        }
+
+        // Create empty media stream for calling
+        function createEmptyMediaStream() {
+            const ctx = document.createElement('canvas').getContext('2d');
+            return ctx.canvas.captureStream();
+        }
+
+        // Toggle Video Fit Mode (Contain vs Cover Aspect Ratio)
+        function toggleVideoFitMode() {
+            const remoteVideo = document.getElementById('remoteVideo');
+            const btn = document.getElementById('fitModeBtn');
+            isVideoCoverFit = !isVideoCoverFit;
+
+            if (isVideoCoverFit) {
+                remoteVideo.classList.remove('object-contain');
+                remoteVideo.classList.add('object-cover');
+                btn.classList.add('bg-indigo-600', 'text-white');
+            } else {
+                remoteVideo.classList.remove('object-cover');
+                remoteVideo.classList.add('object-contain');
+                btn.classList.remove('bg-indigo-600', 'text-white');
+            }
+        }
+
+        // Toggle Audio Mute on Receiver
+        function toggleAudioMute() {
+            const remoteVideo = document.getElementById('remoteVideo');
+            remoteVideo.muted = !remoteVideo.muted;
+
+            const btn = document.getElementById('muteReceiverAudioBtn');
+            btn.innerHTML = remoteVideo.muted 
+                ? `<i class="fa-solid fa-volume-xmark text-red-400 text-xs"></i>` 
+                : `<i class="fa-solid fa-volume-high text-xs"></i>`;
+        }
+
+        // Fullscreen Toggle
+        function toggleFullscreen() {
+            const container = document.getElementById('receiverView');
+            if (!document.fullscreenElement) {
+                container.requestFullscreen().catch(err => {
+                    alert(`Gagal layar penuh: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Disconnect Receiver
+        function disconnectReceiver() {
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+            const remoteVideo = document.getElementById('remoteVideo');
+            remoteVideo.srcObject = null;
+
+            document.getElementById('receiverWaitingOverlay').classList.remove('hidden');
+            updateStatus('disconnected', 'Terputus');
+            showOverlayControls();
+        }
+
+        // ==========================================
+        // AUTO-HIDE OVERLAY CONTROLS (3 DETIK IDLE)
+        // ==========================================
+        function setupReceiverOverlayAutoHide() {
+            const receiverContainer = document.getElementById('receiverView');
+
+            // Activity triggers show overlay & reset timer
+            const handleUserActivity = () => {
+                if (currentRole === 'receiver') {
+                    showOverlayControls();
+                    resetOverlayTimeout();
+                }
+            };
+
+            receiverContainer.addEventListener('mousemove', handleUserActivity);
+            receiverContainer.addEventListener('mousedown', handleUserActivity);
+            receiverContainer.addEventListener('touchstart', handleUserActivity);
+            receiverContainer.addEventListener('touchmove', handleUserActivity);
+        }
+
+        function resetOverlayTimeout() {
+            clearTimeout(overlayTimeout);
+            overlayTimeout = setTimeout(() => {
+                // Only hide if waiting overlay is hidden (active stream)
+                const isWaitingVisible = !document.getElementById('receiverWaitingOverlay').classList.contains('hidden');
+                if (!isWaitingVisible) {
+                    hideOverlayControls();
+                }
+            }, IDLE_TIME_LIMIT);
+        }
+
+        function showOverlayControls() {
+            receiverOverlayControls.classList.remove('overlay-hidden');
+            receiverTopNotice.classList.remove('overlay-hidden');
+            document.body.style.cursor = 'default';
+        }
+
+        function hideOverlayControls() {
+            receiverOverlayControls.classList.add('overlay-hidden');
+            receiverTopNotice.classList.add('overlay-hidden');
+            document.body.style.cursor = 'none'; // Hide mouse cursor in clean monitor mode
+        }
+
+        // ==========================================
+        // MODAL HANDLERS
+        // ==========================================
+        function openHttpsGuideModal() {
+            document.getElementById('httpsGuideModal').classList.remove('hidden');
+        }
+
+        function closeHttpsGuideModal() {
+            document.getElementById('httpsGuideModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
