@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Web CamStream P2P - Auto Landscape & Audio Fixed (1080p)</title>
+    <title>Web CamStream P2P - Auto Landscape & FHD 1080p</title>
     
     <!-- PWA Web App Manifest -->
     <link rel="manifest" id="manifestPlaceholder">
@@ -70,6 +70,15 @@
             }
         }
 
+        /* VERTIKAL SLIDER UNTUK ZOOM SISI KANAN LAYAR */
+        .vertical-slider {
+            writing-mode: bt-lr; /* IE/Edge */
+            -webkit-appearance: slider-vertical; /* WebKit */
+            width: 8px;
+            height: 160px;
+            padding: 0 5px;
+        }
+
         ::-webkit-scrollbar { display: none; }
         * { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -85,7 +94,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-base leading-tight">CamStream<span class="text-indigo-400">P2P</span></h1>
-                    <p class="text-[10px] text-slate-400">Auto Landscape, Audio & FHD 1080p</p>
+                    <p class="text-[10px] text-slate-400">Auto Landscape, Side Zoom & FHD 1080p</p>
                 </div>
             </div>
 
@@ -111,10 +120,10 @@
         <div id="roleSelector" class="space-y-6 max-w-4xl px-4 py-20 w-full my-auto z-10">
             <div class="text-center max-w-2xl mx-auto space-y-3">
                 <span class="px-3 py-1 bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 rounded-full text-xs font-semibold uppercase tracking-wider">
-                    WebRTC Fullscreen Stream (1080p)
+                    WebRTC Fullscreen Stream (Up to 1080p)
                 </span>
                 <h2 class="text-3xl font-extrabold text-white sm:text-4xl tracking-tight">Pilih Peran Perangkat Ini</h2>
-                <p class="text-slate-400 text-sm sm:text-base">Streaming kamera otomatis Landscape dengan kontrol Zoom & kualitas FHD.</p>
+                <p class="text-slate-400 text-sm sm:text-base">Streaming kamera otomatis Landscape dengan kontrol Zoom di sisi layar.</p>
             </div>
 
             <div class="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto pt-2">
@@ -127,7 +136,7 @@
                         </div>
                         <h3 class="text-xl font-bold text-white mb-2">Kirim Kamera (HP / Sender)</h3>
                         <p class="text-slate-400 text-sm leading-relaxed">
-                            Otomatis mengunci tampilan Landscape, fitur Zoom, Kecerahan & Mikrofon aktif.
+                            Otomatis mengunci tampilan Landscape, fitur Slider Zoom di sisi kanan layar & Resolusi hingga 1920x1080.
                         </p>
                     </div>
                     <div class="mt-6 flex items-center text-indigo-400 font-semibold text-sm group-hover:translate-x-1 transition-transform">
@@ -167,7 +176,7 @@
                 <!-- Loading Camera Overlay -->
                 <div id="cameraLoadingOverlay" class="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center gap-3 p-4 text-center z-40">
                     <i class="fa-solid fa-circle-notch text-4xl text-indigo-500 animate-spin"></i>
-                    <p id="cameraLoadingText" class="text-slate-300 text-sm font-medium">Membuka Kamera 1080p & Mikrofon...</p>
+                    <p id="cameraLoadingText" class="text-slate-300 text-sm font-medium">Membuka Kamera & Mikrofon...</p>
                 </div>
 
                 <!-- TOP FLOATING CONTROLS -->
@@ -186,6 +195,14 @@
                     </button>
                 </div>
 
+                <!-- SLIDER ZOOM SISI KANAN LAYAR (SEPERTI APLIKASI KAMERA HP) -->
+                <div class="absolute right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-2 bg-slate-950/40 backdrop-blur-md p-3 rounded-full border border-white/10 shadow-2xl">
+                    <i class="fa-solid fa-magnifying-glass-plus text-xs text-indigo-400"></i>
+                    <span id="sideZoomValueText" class="text-[10px] font-mono font-bold text-white">1.0x</span>
+                    <input type="range" id="sideZoomRange" min="1" max="5" step="0.1" value="1" oninput="applyZoom(this.value)" class="vertical-slider accent-indigo-500 bg-transparent cursor-pointer">
+                    <i class="fa-solid fa-magnifying-glass-minus text-xs text-indigo-400"></i>
+                </div>
+
                 <!-- BOTTOM CAMERA CONTROLS -->
                 <div class="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-6 z-40 px-4">
                     <button id="toggleMicBtn" onclick="toggleLocalAudio()" class="glass-btn p-4 rounded-full text-white shadow-xl hover:bg-slate-800/80 transition flex items-center justify-center w-14 h-14">
@@ -196,9 +213,8 @@
                         <i class="fa-solid fa-rotate text-2xl"></i>
                     </button>
 
-                    <button onclick="openCameraControlsModal()" class="glass-btn p-4 rounded-full text-amber-300 shadow-xl hover:bg-slate-800/80 transition flex items-center justify-center w-14 h-14 relative" title="Pengaturan Kamera & Zoom">
+                    <button onclick="openCameraControlsModal()" class="glass-btn p-4 rounded-full text-amber-300 shadow-xl hover:bg-slate-800/80 transition flex items-center justify-center w-14 h-14 relative" title="Pengaturan Kamera & Resolusi">
                         <i class="fa-solid fa-sliders text-xl"></i>
-                        <span class="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-slate-900"></span>
                     </button>
                 </div>
             </div>
@@ -305,12 +321,12 @@
 
     </main>
 
-    <!-- POPUP SETTING KAMERA (ZOOM, BRIGHTNESS, CONTRAST) -->
+    <!-- POPUP SETTING KAMERA & RESOLUSI -->
     <div id="cameraControlsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
         <div class="glass-card max-w-md w-full rounded-2xl border border-slate-700 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div class="px-5 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
                 <h3 class="font-bold text-sm text-white flex items-center gap-2">
-                    <i class="fa-solid fa-sliders text-indigo-400"></i> Pengaturan Kamera & Gambar
+                    <i class="fa-solid fa-sliders text-indigo-400"></i> Pengaturan Kamera & Resolusi
                 </h3>
                 <button onclick="closeCameraControlsModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
                     <i class="fa-solid fa-xmark text-lg"></i>
@@ -318,19 +334,24 @@
             </div>
 
             <div class="p-5 space-y-5 overflow-y-auto text-xs text-slate-300">
-                <!-- Control 1: Zoom Kamera -->
+                
+                <!-- OPSI RESOLUSI KAMERA (HINGGA 1920x1080) -->
                 <div class="space-y-2">
-                    <div class="flex justify-between items-center">
-                        <label class="font-semibold text-slate-200 flex items-center gap-2">
-                            <i class="fa-solid fa-magnifying-glass text-indigo-400"></i> Zoom Level
-                        </label>
-                        <span id="zoomValueText" class="font-mono text-indigo-400 font-bold">1.0x</span>
-                    </div>
-                    <input type="range" id="zoomRange" min="1" max="5" step="0.1" value="1" oninput="applyZoom(this.value)" class="w-full accent-indigo-500 bg-slate-900 rounded-lg cursor-pointer h-2">
-                    <p id="hardwareZoomSupportText" class="text-[10px] text-slate-500 italic">Mencari dukungan Zoom Hardware...</p>
+                    <label class="font-semibold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-expand text-indigo-400"></i> Resolusi Streaming Video
+                    </label>
+                    <select id="resolutionSelect" onchange="changeCameraResolution(this.value)" class="w-full bg-slate-900 border border-slate-700 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-white font-mono outline-none">
+                        <option value="1920">1920 × 1080 (Full HD / 1080p) - Maksimal</option>
+                        <option value="1280">1280 × 720 (HD / 720p) - Standar</option>
+                        <option value="854">854 × 480 (SD / 480p) - Hemat Bandwidth</option>
+                        <option value="640">640 × 360 (VGA / 360p) - Koneksi Lambat</option>
+                    </select>
+                    <p id="resolutionStatusText" class="text-[10px] text-slate-500 italic">Otomatis menyesuaikan dengan kemampuan sensor HP.</p>
                 </div>
 
-                <!-- Control 2: Kecerahan (Brightness) -->
+                <hr class="border-slate-800">
+
+                <!-- Control: Kecerahan (Brightness) -->
                 <div class="space-y-2">
                     <div class="flex justify-between items-center">
                         <label class="font-semibold text-slate-200 flex items-center gap-2">
@@ -341,7 +362,7 @@
                     <input type="range" id="brightnessRange" min="50" max="150" step="1" value="100" oninput="applyCameraEffects()" class="w-full accent-amber-500 bg-slate-900 rounded-lg cursor-pointer h-2">
                 </div>
 
-                <!-- Control 3: Kontras (Contrast) -->
+                <!-- Control: Kontras (Contrast) -->
                 <div class="space-y-2">
                     <div class="flex justify-between items-center">
                         <label class="font-semibold text-slate-200 flex items-center gap-2">
@@ -401,8 +422,8 @@
                     </h4>
                     <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px] leading-relaxed">
                         <li>Layar otomatis terkunci di mode **Landscape**.</li>
-                        <li>Kualitas video diset ke **Full HD 1080p**.</li>
-                        <li>Gunakan tombol gerigi untuk mengatur Zoom & Gambar.</li>
+                        <li>Gunakan slider vertikal di sisi kanan layar untuk **Zoom**.</li>
+                        <li>Ubah resolusi hingga 1920 (1080p) di tombol **Pengaturan**.</li>
                     </ul>
                 </div>
             </div>
@@ -519,6 +540,8 @@
         let localStream = null;
         let currentCall = null;
         let currentFacingMode = 'environment';
+        let currentTargetWidth = 1920; // Default 1080p Full HD
+        let currentTargetHeight = 1080;
         let isAudioEnabled = true;
         let isVideoCoverFit = false;
         let videoTrackCapabilities = null;
@@ -611,7 +634,7 @@
         // SENDER LOGIC (AUTO LANDSCAPE, 1080P & ZOOM CONTROLS)
         // ==========================================
         async function initSender() {
-            updateSenderStatus('Memuat Kamera 1080p...');
+            updateSenderStatus('Memuat Kamera ' + currentTargetWidth + 'p...');
             await startLocalCameraWithFallback(currentFacingMode);
 
             const customId = 'cam-' + Math.random().toString(36).substring(2, 8);
@@ -650,19 +673,18 @@
                 localStream.getTracks().forEach(track => track.stop());
             }
 
-            // MENGUTAMAKAN RESOLUSI FULL HD (1920x1080)
             const constraintAttempts = [
-                // Option 1: Full HD 1080p Ideal
+                // Option 1: Dynamic Target Resolution
                 { 
                     video: { 
                         facingMode: { ideal: facingMode }, 
-                        width: { ideal: 1920 }, 
-                        height: { ideal: 1080 }, 
+                        width: { ideal: currentTargetWidth }, 
+                        height: { ideal: currentTargetHeight }, 
                         aspectRatio: { ideal: 1.777777778 } 
                     }, 
                     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
                 },
-                // Option 2: HD 720p Fallback
+                // Option 2: HD Fallback
                 { 
                     video: { 
                         facingMode: { ideal: facingMode }, 
@@ -681,7 +703,7 @@
 
             for (let i = 0; i < constraintAttempts.length; i++) {
                 try {
-                    loadingText.innerText = `Mengakses Kamera 1080p (${i + 1}/4)...`;
+                    loadingText.innerText = `Mengakses Kamera ${currentTargetWidth}p (${i + 1}/4)...`;
                     localStream = await navigator.mediaDevices.getUserMedia(constraintAttempts[i]);
                     streamAcquired = true;
                     break;
@@ -716,20 +738,30 @@
             }
         }
 
+        function changeCameraResolution(val) {
+            const width = parseInt(val);
+            let height = 1080;
+            if (width === 1280) height = 720;
+            if (width === 854) height = 480;
+            if (width === 640) height = 360;
+
+            currentTargetWidth = width;
+            currentTargetHeight = height;
+
+            startLocalCameraWithFallback(currentFacingMode);
+        }
+
         function initCameraCapabilities() {
             if (!localStream) return;
             const videoTrack = localStream.getVideoTracks()[0];
-            const zoomRange = document.getElementById('zoomRange');
-            const supportText = document.getElementById('hardwareZoomSupportText');
+            const sideZoomRange = document.getElementById('sideZoomRange');
 
             if (videoTrack && typeof videoTrack.getCapabilities === 'function') {
                 videoTrackCapabilities = videoTrack.getCapabilities();
                 if (videoTrackCapabilities.zoom) {
-                    zoomRange.min = videoTrackCapabilities.zoom.min || 1;
-                    zoomRange.max = videoTrackCapabilities.zoom.max || 5;
-                    zoomRange.step = videoTrackCapabilities.zoom.step || 0.1;
-                    supportText.innerText = "Zoom Hardware Kamera Didukung ✓";
-                    supportText.className = "text-[10px] text-emerald-400 italic";
+                    sideZoomRange.min = videoTrackCapabilities.zoom.min || 1;
+                    sideZoomRange.max = videoTrackCapabilities.zoom.max || 5;
+                    sideZoomRange.step = videoTrackCapabilities.zoom.step || 0.1;
                 } else {
                     setupSoftwareZoom();
                 }
@@ -739,17 +771,14 @@
         }
 
         function setupSoftwareZoom() {
-            const zoomRange = document.getElementById('zoomRange');
-            const supportText = document.getElementById('hardwareZoomSupportText');
-            zoomRange.min = 1;
-            zoomRange.max = 3;
-            zoomRange.step = 0.1;
-            supportText.innerText = "Zoom Hardware tidak tersedia, menggunakan Digital Crop.";
-            supportText.className = "text-[10px] text-amber-400 italic";
+            const sideZoomRange = document.getElementById('sideZoomRange');
+            sideZoomRange.min = 1;
+            sideZoomRange.max = 3;
+            sideZoomRange.step = 0.1;
         }
 
         function applyZoom(val) {
-            document.getElementById('zoomValueText').innerText = parseFloat(val).toFixed(1) + 'x';
+            document.getElementById('sideZoomValueText').innerText = parseFloat(val).toFixed(1) + 'x';
             if (!localStream) return;
             const videoTrack = localStream.getVideoTracks()[0];
 
@@ -779,7 +808,7 @@
         function resetCameraEffects() {
             document.getElementById('brightnessRange').value = 100;
             document.getElementById('contrastRange').value = 100;
-            document.getElementById('zoomRange').value = 1;
+            document.getElementById('sideZoomRange').value = 1;
             applyZoom(1);
             applyCameraEffects();
         }
